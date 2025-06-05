@@ -11,6 +11,7 @@ public interface IDbService
 {
     Task<TripWithPagesGetDto> GetTripsAsync(int page, int pageSize);
     Task AddClientToTripAsync(int idTrip, TripClientCreateDto clientDto);
+    Task DeleteClientAsync(int idClient);
 }
 
 public class DbService(MasterContext data) : IDbService
@@ -96,6 +97,26 @@ public class DbService(MasterContext data) : IDbService
             PaymentDate = clientDto.PaymentDate,
         };
         await data.ClientTrips.AddAsync(clientTrip);
+        await data.SaveChangesAsync();
+    }
+
+    public async Task DeleteClientAsync(int idClient)
+    {
+        var client = await data.Clients
+            .Include(c => c.ClientTrips)
+            .FirstOrDefaultAsync(c => c.IdClient == idClient);
+
+        if (client == null)
+        {
+            throw new ClientNotFoundExcpetion($"Client with id {idClient} was not found!");
+        }
+
+        if (client.ClientTrips.Any())
+        {
+            throw new ClientWithTripsException($"Client with id {idClient} has trips and cannot be deleted!");
+        }
+        
+        data.Clients.Remove(client);
         await data.SaveChangesAsync();
     }
 }
