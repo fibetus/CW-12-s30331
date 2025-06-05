@@ -51,7 +51,7 @@ public class TripsController(IDbService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, ex);
+            return StatusCode(500, ex.Message);
         }
     }
 }

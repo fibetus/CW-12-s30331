@@ -91,11 +91,12 @@ public class DbService(MasterContext data) : IDbService
 
         var clientTrip = new ClientTrip
         {
-            IdClient = newClient.IdClient,
+            IdClientNavigation = newClient,
             IdTrip = idTrip,
             RegisteredAt = DateTime.Now,
             PaymentDate = clientDto.PaymentDate,
         };
+        await data.Clients.AddAsync(newClient);
         await data.ClientTrips.AddAsync(clientTrip);
         await data.SaveChangesAsync();
     }

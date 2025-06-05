@@ -14,7 +14,7 @@ public class ClientsController(IDbService service) : ControllerBase
         try
         {
             await service.DeleteClientAsync(idClient);
-            return StatusCode(204, $"Client {idClient} deleted");
+            return StatusCode(200, $"Client {idClient} deleted");
         }
         catch (ClientNotFoundExcpetion e)
         {
