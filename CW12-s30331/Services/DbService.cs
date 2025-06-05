@@ -93,7 +93,7 @@ public class DbService(MasterContext data) : IDbService
         {
             IdClient = newClient.IdClient,
             IdTrip = idTrip,
-            RegisteredAt = DateTime.Today,
+            RegisteredAt = DateTime.Now,
             PaymentDate = clientDto.PaymentDate,
         };
         await data.ClientTrips.AddAsync(clientTrip);
