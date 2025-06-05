@@ -76,7 +76,7 @@ public class DbService(MasterContext data) : IDbService
             throw new ClientAlreadyExistsException($"Client with PESEL {clientDto.Pesel} already exists!");
         }
         
-        // Według polecenia powinnienem jeszcze sprwadzić czy PESEL jest już zapisany na wycieczkę, ale nie może być zapisany
+        // Według polecenia powinienem jeszcze sprawdzić czy PESEL jest już zapisany na wycieczkę, ale nie może być zapisany
         // jeśli on nie istnieje. Jeśli istnieje, to poprzednie exception go zcatchuje, więc nigdy nie dojdzie do tego momentu
 
         var newClient = new Client
