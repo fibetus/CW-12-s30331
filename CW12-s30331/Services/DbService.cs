@@ -58,66 +58,87 @@ public class DbService(MasterContext data) : IDbService
 
     public async Task AddClientToTripAsync(int idTrip, TripClientCreateDto clientDto)
     {
-        var trip = await data.Trips.FindAsync(idTrip);
-        if (trip == null)
+        await using var transaction = await data.Database.BeginTransactionAsync();
+        try
         {
-            throw new TripNotFoundException($"Trip with id {idTrip} was not found!");
+            var trip = await data.Trips.FindAsync(idTrip);
+            if (trip == null)
+            {
+                throw new TripNotFoundException($"Trip with id {idTrip} was not found!");
+            }
+
+            if (trip.DateFrom <= DateTime.Now)
+            {
+                throw new TripAlreadyStartedException($"Trip with id {idTrip} has already started!");
+            }
+
+            var clientWithPeselExists = await data.Clients.AnyAsync(c => c.Pesel == clientDto.Pesel);
+
+            if (clientWithPeselExists)
+            {
+                throw new ClientAlreadyExistsException($"Client with PESEL {clientDto.Pesel} already exists!");
+            }
+
+            // Według polecenia powinienem jeszcze sprawdzić czy PESEL jest już zapisany na wycieczkę, ale nie może być zapisany
+            // jeśli on nie istnieje. Jeśli istnieje, to poprzednie exception go zcatchuje, więc nigdy nie dojdzie do tego momentu
+
+            var newClient = new Client
+            {
+                FirstName = clientDto.FirstName,
+                LastName = clientDto.LastName,
+                Email = clientDto.Email,
+                Telephone = clientDto.Telephone,
+                Pesel = clientDto.Pesel,
+            };
+            await data.Clients.AddAsync(newClient);
+
+            var clientTrip = new ClientTrip
+            {
+                IdClientNavigation = newClient,
+                IdTrip = idTrip,
+                RegisteredAt = DateTime.Now,
+                PaymentDate = clientDto.PaymentDate,
+            };
+            await data.ClientTrips.AddAsync(clientTrip);
+            
+            await data.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
-
-        if (trip.DateFrom <= DateTime.Now)
+        catch (Exception e)
         {
-            throw new TripAlreadyStartedException($"Trip with id {idTrip} has already started!");
+            await transaction.RollbackAsync();
+            throw;
         }
-        
-        var clientWithPeselExists = await data.Clients.AnyAsync(c => c.Pesel == clientDto.Pesel);
-
-        if (clientWithPeselExists)
-        {
-            throw new ClientAlreadyExistsException($"Client with PESEL {clientDto.Pesel} already exists!");
-        }
-        
-        // Według polecenia powinienem jeszcze sprawdzić czy PESEL jest już zapisany na wycieczkę, ale nie może być zapisany
-        // jeśli on nie istnieje. Jeśli istnieje, to poprzednie exception go zcatchuje, więc nigdy nie dojdzie do tego momentu
-
-        var newClient = new Client
-        {
-            FirstName = clientDto.FirstName,
-            LastName = clientDto.LastName,
-            Email = clientDto.Email,
-            Telephone = clientDto.Telephone,
-            Pesel = clientDto.Pesel,
-        };
-        await data.Clients.AddAsync(newClient);
-
-        var clientTrip = new ClientTrip
-        {
-            IdClientNavigation = newClient,
-            IdTrip = idTrip,
-            RegisteredAt = DateTime.Now,
-            PaymentDate = clientDto.PaymentDate,
-        };
-        await data.Clients.AddAsync(newClient);
-        await data.ClientTrips.AddAsync(clientTrip);
-        await data.SaveChangesAsync();
     }
 
     public async Task DeleteClientAsync(int idClient)
     {
-        var client = await data.Clients
-            .Include(c => c.ClientTrips)
-            .FirstOrDefaultAsync(c => c.IdClient == idClient);
-
-        if (client == null)
+        await using var transaction = await data.Database.BeginTransactionAsync();
+        try
         {
-            throw new ClientNotFoundExcpetion($"Client with id {idClient} was not found!");
-        }
+            var client = await data.Clients
+                .Include(c => c.ClientTrips)
+                .FirstOrDefaultAsync(c => c.IdClient == idClient);
 
-        if (client.ClientTrips.Any())
-        {
-            throw new ClientWithTripsException($"Client with id {idClient} has trips and cannot be deleted!");
+            if (client == null)
+            {
+                throw new ClientNotFoundExcpetion($"Client with id {idClient} was not found!");
+            }
+
+            if (client.ClientTrips.Any())
+            {
+                throw new ClientWithTripsException($"Client with id {idClient} has trips and cannot be deleted!");
+            }
+
+            data.Clients.Remove(client);
+            await data.SaveChangesAsync();
+            
+            await transaction.CommitAsync();
         }
-        
-        data.Clients.Remove(client);
-        await data.SaveChangesAsync();
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
